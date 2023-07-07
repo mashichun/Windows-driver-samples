@@ -74,6 +74,8 @@ BOOLEAN
 DoFileReadWrite(
     HANDLE HDevice
     );
+VOID
+MyIoctls(HANDLE hDevice);
 
 VOID
 DoIoctls(
@@ -88,7 +90,7 @@ CHAR G_coInstallerVersion[MAX_VERSION_SIZE] = {0};
 BOOLEAN  G_fLoop = FALSE;
 BOOL G_versionSpecified = FALSE;
 
-
+int G_mlzise = 1;
 
 //-----------------------------------------------------------------------------
 // 4127 -- Conditional Expression is Constant warning
@@ -182,6 +184,10 @@ Return Value:
             case 'l':
             case 'L':
                 G_fLoop = TRUE;
+                break;
+            case 'm':
+            case 'M':
+                G_mlzise *= 2;
                 break;
             default:
                 printf(USAGE);
@@ -323,9 +329,12 @@ main(
             return;
         }
     }
-
+    printf("%s:%d\n",
+        __func__, __LINE__);
+    MyIoctls(hDevice);
     DoIoctls(hDevice);
-
+    printf("%s:%d\n",
+        __func__, __LINE__);
     do {
 
         if(!DoFileReadWrite(hDevice)) {
@@ -360,6 +369,48 @@ main(
     return;
 }
 
+VOID
+MyIoctls(HANDLE hDevice)
+{
+
+        char OutputBuffer[100];
+        char InputBuffer[200];
+        BOOL bRc;
+        ULONG bytesReturned;
+
+        //
+        // Printing Input & Output buffer pointers and size
+        //
+
+        printf("InputBuffer Pointer = %p, BufLength = %Id\n", InputBuffer,
+            sizeof(InputBuffer));
+        printf("OutputBuffer Pointer = %p BufLength = %Id\n", OutputBuffer,
+            sizeof(OutputBuffer));
+        printf("\nCalling DeviceIoControl IOCTL_NONPNP_METHOD_TEST_MALC %d:\n", G_mlzise);
+
+        memset(OutputBuffer, 0, sizeof(OutputBuffer));
+        InputBuffer[0] = 0x55;
+        InputBuffer[1] = 0xAA;
+        InputBuffer[2] = (char)G_mlzise;
+
+        bRc = DeviceIoControl(hDevice,
+            (DWORD)IOCTL_NONPNP_METHOD_TEST_MALC,
+            InputBuffer,
+            (DWORD)strlen(InputBuffer) + 1,
+            OutputBuffer,
+            sizeof(OutputBuffer),
+            &bytesReturned,
+            NULL
+        );
+
+        if (!bRc)
+        {
+            printf("Error in DeviceIoControl : %d", GetLastError());
+            return;
+
+        }
+        printf("    OutBuffer (%d): %s\n", bytesReturned, OutputBuffer);
+}
 
 VOID
 DoIoctls(

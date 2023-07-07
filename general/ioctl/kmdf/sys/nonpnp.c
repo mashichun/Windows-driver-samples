@@ -801,6 +801,12 @@ Return Value:
     PCHAR               buffer = NULL;
     PREQUEST_CONTEXT    reqContext = NULL;
     size_t               bufSize;
+    int                 cnt;
+    PCHAR               pBuf;
+    PHYSICAL_ADDRESS HighestAcceptableAddress;
+    PHYSICAL_ADDRESS phBuf;
+    //HighestAcceptableAddress.QuadPart = 0xFFFFFFFF00000000;
+    HighestAcceptableAddress.QuadPart = 0x100000000;
 
     UNREFERENCED_PARAMETER( Queue );
 
@@ -815,9 +821,31 @@ Return Value:
     //
     // Determine which I/O control code was specified.
     //
-
+    //
     switch (IoControlCode)
     {
+    case IOCTL_NONPNP_METHOD_TEST_MALC:
+        status = WdfRequestRetrieveInputBuffer(Request, 0, &inBuf, &bufSize);
+        TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "Called IOCTL_NONPNP_METHOD_TEST_MALC %d\n", status);
+        if (!NT_SUCCESS(status)) {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+            break;
+        }
+
+        ASSERT(bufSize == InputBufferLength);
+        cnt = (int)inBuf[2];
+        pBuf = MmAllocateContiguousMemory(cnt * 1024 * 1024, HighestAcceptableAddress);
+        TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "Called IOCTL_NONPNP_METHOD_TEST_MALC %x, %x %x, %p\n",
+            inBuf[0], inBuf[1], cnt, pBuf);
+        if (pBuf) {
+            phBuf = MmGetPhysicalAddress(pBuf);
+            TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "buf physical info %p: %llx\n",
+                pBuf, phBuf.QuadPart);
+        }
+        
+        if (pBuf)
+            MmFreeContiguousMemory(pBuf);
+        break;
     case IOCTL_NONPNP_METHOD_BUFFERED:
 
 
