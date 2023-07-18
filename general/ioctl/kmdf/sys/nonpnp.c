@@ -760,6 +760,7 @@ Return Value:
 
 }
 
+PCHAR pgBuf[8];
 VOID
 FileEvtIoDeviceControl(
     IN WDFQUEUE         Queue,
@@ -804,9 +805,13 @@ Return Value:
     int                 cnt;
     PCHAR               pBuf;
     PHYSICAL_ADDRESS HighestAcceptableAddress;
+    PHYSICAL_ADDRESS LowestAcceptableAddress;
+    PHYSICAL_ADDRESS BoundAcceptableAddress = { 0 };
     PHYSICAL_ADDRESS phBuf;
+    int             i;
     //HighestAcceptableAddress.QuadPart = 0xFFFFFFFF00000000;
     HighestAcceptableAddress.QuadPart = 0x100000000;
+    LowestAcceptableAddress.QuadPart = 8 * 1024 * 1024;
 
     UNREFERENCED_PARAMETER( Queue );
 
@@ -834,17 +839,29 @@ Return Value:
 
         ASSERT(bufSize == InputBufferLength);
         cnt = (int)inBuf[2];
-        pBuf = MmAllocateContiguousMemory(cnt * 1024 * 1024, HighestAcceptableAddress);
-        TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "Called IOCTL_NONPNP_METHOD_TEST_MALC %x, %x %x, %p\n",
-            inBuf[0], inBuf[1], cnt, pBuf);
-        if (pBuf) {
-            phBuf = MmGetPhysicalAddress(pBuf);
-            TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "buf physical info %p: %llx\n",
-                pBuf, phBuf.QuadPart);
+        for (i = 0; i < 8; i++) {
+            //pBuf = MmAllocateContiguousMemory(cnt * 1024 * 1024, HighestAcceptableAddress);
+            pBuf = MmAllocateContiguousMemorySpecifyCache(cnt * 1024 * 1024,
+                LowestAcceptableAddress,
+                HighestAcceptableAddress,
+                BoundAcceptableAddress, MmNonCached);
+            TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "Called IOCTL_NONPNP_METHOD_TEST_MALC %x, %x %x, %p\n",
+                inBuf[0], inBuf[1], cnt, pBuf);
+            if (pBuf) {
+                phBuf = MmGetPhysicalAddress(pBuf);
+                TraceEvents(TRACE_LEVEL_VERBOSE, DBG_IOCTL, "buf physical info %p: %llx with size: %dMB\n",
+                    pBuf, phBuf.QuadPart, cnt);
+            }
+            pgBuf[i] = pBuf;
         }
-        
+        for (i = 0; i < 8; i++) {
+            if (pgBuf[i])
+                MmFreeContiguousMemory(pgBuf[i]);
+        }
+#if 0
         if (pBuf)
             MmFreeContiguousMemory(pBuf);
+#endif
         break;
     case IOCTL_NONPNP_METHOD_BUFFERED:
 
